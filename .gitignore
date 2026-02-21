@@ -6,8 +6,7 @@
 .qualtRics.yml
 .qualtRicstmp.yml
 inst/doc
-/man/qualtRicsResponseCodes.Rd
 /dev/*
 /revdep/*noindex/
 *sqlite
-tests/testthat/test-qualtrics-api-request.R
+*.log

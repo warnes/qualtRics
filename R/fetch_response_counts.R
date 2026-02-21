@@ -21,10 +21,8 @@
 #'   One or more of:
 #'   \describe{
 #'     \item{`"distributions"`}{Distributions API columns (`dist_*`).}
-#'     \item{`"metadata"`}{Metadata API columns (`meta_*`) and the derived
-#'       `meta_response_rate`.}
-#'     \item{`"responses"`}{Response Export API columns (`export_*`) and the
-#'       derived `export_response_rate`.}
+#'     \item{`"metadata"`}{Metadata API columns (`meta_*`).}
+#'     \item{`"responses"`}{Response Export API columns (`export_*`).}
 #'     \item{`"all"`}{All of the above (default).}
 #'   }
 #'   Multiple values may be combined, e.g. `type = c("metadata", "responses")`.
@@ -40,15 +38,16 @@
 #'       (`stats_started - stats_finished`). Lower-bound estimate.}
 #'     \item{dist_completed}{Submitted via a tracked link (`stats_finished`).
 #'       Undercounts responses arriving via anonymous or direct links.}
+#'     \item{dist_response_rate_complete}{`dist_completed / dist_invited`.
+#'       `NA` when `dist_invited == 0`.}
+#'     \item{dist_response_rate_total}{`(dist_completed + dist_in_progress) / dist_invited`.
+#'       `NA` when `dist_invited == 0`.}
 #'   }
 #'
 #'   **Metadata API** (`type` includes `"metadata"`; all channels):
 #'   \describe{
 #'     \item{meta_completed}{All submitted responses regardless of channel
 #'       (`responsecounts$auditable`). **Authoritative completed count.**}
-#'     \item{meta_response_rate}{`meta_completed / dist_invited`. Requires
-#'       `"distributions"` to also be included; `NA` otherwise or when
-#'       `dist_invited == 0`.}
 #'   }
 #'
 #'   **Response Export API** (`type` includes `"responses"`; all channels):
@@ -59,9 +58,6 @@
 #'     \item{export_in_progress}{Responses currently in-progress across all
 #'       channels, from `fetch_survey(responses = "in_progress")`.
 #'       **Authoritative in-progress count.**}
-#'     \item{export_response_rate}{`export_completed / dist_invited`. Requires
-#'       `"distributions"` to also be included; `NA` otherwise or when
-#'       `dist_invited == 0`.}
 #'   }
 #'
 #' @template retry-advice
@@ -149,18 +145,8 @@ fetch_response_counts <- function(
       # --- Source 1: Distributions API ---------------------------------------
       # Tracks responses from emailed distribution links only.
       # Does NOT capture anonymous/direct-link access.
-      if ("distributions" %in% type || "metadata" %in% type || "responses" %in% type) {
-        # dist_invited is needed for response_rate regardless of whether
-        # "distributions" is requested, so always compute it when any rate is needed
-        need_dist <- "distributions" %in% type ||
-          (("metadata" %in% type || "responses" %in% type))
-      }
 
-      dist_invited <- NA_integer_
-
-      if ("distributions" %in% type ||
-          "metadata"      %in% type ||
-          "responses"     %in% type) {
+      if ("distributions" %in% type) {
         dists <- fetch_distributions(sid)
 
         if (nrow(dists) == 0) {
@@ -174,11 +160,19 @@ fetch_response_counts <- function(
           dist_in_progress <- dist_started - dist_completed
         }
 
-        if ("distributions" %in% type) {
-          out$dist_invited     <- dist_invited
-          out$dist_in_progress <- dist_in_progress
-          out$dist_completed   <- dist_completed
-        }
+        out$dist_invited     <- dist_invited
+        out$dist_in_progress <- dist_in_progress
+        out$dist_completed   <- dist_completed
+        out$dist_response_rate_complete <- dplyr::if_else(
+          dist_invited > 0L,
+          dist_completed / dist_invited,
+          NA_real_
+        )
+        out$dist_response_rate_total <- dplyr::if_else(
+          dist_invited > 0L,
+          (dist_completed + dist_in_progress) / dist_invited,
+          NA_real_
+        )
       }
 
       # --- Source 2: Metadata API --------------------------------------------
@@ -196,13 +190,7 @@ fetch_response_counts <- function(
         }
 
         if ("metadata" %in% type) {
-          meta_completed <- md$responsecounts$auditable
-          out$meta_completed <- meta_completed
-          out$meta_response_rate <- dplyr::if_else(
-            !is.na(dist_invited) & dist_invited > 0L,
-            meta_completed / dist_invited,
-            NA_real_
-          )
+          out$meta_completed <- md$responsecounts$auditable
         }
       } else {
         out$survey_name <- survey_names[[i]]
@@ -221,11 +209,6 @@ fetch_response_counts <- function(
 
         out$export_completed   <- export_completed
         out$export_in_progress <- export_in_progress
-        out$export_response_rate <- dplyr::if_else(
-          !is.na(dist_invited) & dist_invited > 0L,
-          export_completed / dist_invited,
-          NA_real_
-        )
       }
 
       out
