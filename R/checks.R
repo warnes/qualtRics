@@ -140,6 +140,22 @@ checkarg_ischaracter <-
   }
 
 
+#' Is a length-1 non-negative numeric scalar
+#' @importFrom rlang abort
+#' @importFrom glue glue
+#' @keywords internal
+checkarg_isnumeric <-
+  function(arg, null_okay = TRUE) {
+    if (null_okay && is.null(arg)) return()
+    test <- length(arg) == 1 && is.numeric(arg) && !is.na(arg)
+    if (!test) {
+      rlang::abort(
+        c(glue::glue("Error in argument '{deparse(substitute(arg))}':'"),
+          "Argument must be a single numeric value.")
+      )
+    }
+  }
+
 #' Is integerish (length-1 numeric w/o any fractional component)
 #' @importFrom rlang abort
 #' @importFrom glue glue

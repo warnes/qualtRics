@@ -24,6 +24,8 @@ fetch_survey(
   add_var_labels = TRUE,
   strip_html = TRUE,
   col_types = NULL,
+  quiet = FALSE,
+  responses,
   verbose = TRUE,
   tmp_dir = tempdir(),
   last_response = deprecated(),
@@ -109,6 +111,23 @@ descriptions. Defaults to \code{TRUE}.  Ignored if  \code{add_column_map} and
 column types that may be incorrectly guessed. Takes a \code{\link[readr:cols]{readr::cols()}}
 specification. See example below and \code{\link[readr:cols]{readr::cols()}} for formatting
 details. Defaults to \code{NULL}. Overwritten by \code{convert = TRUE}.}
+
+\item{quiet}{Logical. If \code{TRUE}, suppress the column-type messages that
+\code{\link[readr:type_convert]{readr::type_convert()}} prints when \code{col_types} is not supplied. Defaults
+to \code{FALSE}.}
+
+\item{responses}{String. Which responses to return. Must be one of:
+\describe{
+\item{\code{"complete"}}{Only submitted (finished) responses. Equivalent to
+the default Qualtrics export behaviour.}
+\item{\code{"in_progress"}}{Only responses that have been started but not yet
+submitted (\code{Finished == FALSE}). Uses the
+\code{exportResponsesInProgress} API parameter.}
+\item{\code{"all"}}{All responses — submitted and in-progress — combined.
+Makes two API requests and row-binds the results.}
+}
+This argument is \strong{required} and has no default; you must explicitly
+choose which responses to retrieve.}
 
 \item{verbose}{Logical. If \code{TRUE}, verbose messages will be printed to the R
 console. Defaults to \code{TRUE}.}

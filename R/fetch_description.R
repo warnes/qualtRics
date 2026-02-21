@@ -82,7 +82,7 @@ fetch_description <-
 
     # Send GET request to survey-definitions endpoint:
     resp <-
-      qualtrics_api_request("GET", description_url)
+      cached_api_request("GET", description_url)
 
     # Extract result
     result <-

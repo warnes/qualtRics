@@ -1,5 +1,32 @@
 # qualtRics (development version)
 
+- Fixed factor level mismatch warning when Qualtrics answer choice text contains
+  leading or trailing whitespace. `wrapper_mc()` now trims whitespace from both
+  factor levels and response values before calling `readr::parse_factor()`.
+
+- Added on-disk response caching via `memoise` + `cachem::cache_disk()`. All
+  GET-based API calls (`all_surveys()`, `metadata()`, `fetch_distributions()`,
+  `fetch_distribution_history()`, `survey_questions()`, `column_map()`,
+  `fetch_description()`) and the response-export file download inside
+  `fetch_survey()` are now cached. The default TTL is 24 hours. Configure with
+  `qualtrics_configure_cache(ttl, dir)` and clear with
+  `qualtrics_clear_cache()`. Set `ttl = 0` to disable caching entirely.
+  Cache settings persist for the session; add
+  `options(qualtRics.cache_ttl = <seconds>)` to `.Rprofile` for permanent
+  configuration.
+
+- Added `fetch_response_counts()` to retrieve invited, in-progress, and
+  completed response counts for one or more surveys. Uses
+  `metadata()$responsecounts$auditable` as the authoritative completed count
+  (all channels), and `fetch_distributions()` stats for invited and in-progress
+  counts (tracked distribution links only).
+
+- Added `responses` argument to `fetch_survey()` to control which responses are
+  returned. Must be one of `"complete"` (submitted responses only), 
+  `"in_progress"` (started but not submitted), or `"all"` (both, via two API
+  requests that are row-bound). This argument is mandatory with no default,
+  replacing the previous `include_in_progress` logical.
+
 # qualtRics 3.2.2
 
 - Again changed how CSV files are extracted from the Qualtrics zip archive, to handle more special characters in survey titles (#355)

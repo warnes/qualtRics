@@ -70,7 +70,7 @@ metadata <- function(surveyID,
                              surveyID = surveyID)
 
   # Send GET request to specific survey
-  resp <- qualtrics_api_request("GET", survey_url)
+  resp <- cached_api_request("GET", survey_url)
 
   # Filter
   resp_filt <- resp$result

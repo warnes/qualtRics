@@ -26,6 +26,7 @@ URL: https://docs.ropensci.org/qualtRics/,
 BugReports: https://github.com/ropensci/qualtRics/issues
 Imports:
     archive,
+    cachem,
     cli,
     dplyr (>= 1.0),
     fs,
@@ -34,6 +35,7 @@ Imports:
     jsonlite,
     lifecycle,
     lubridate,
+    memoise,
     purrr,
     readr,
     rlang,
@@ -54,5 +56,5 @@ VignetteBuilder:
 Encoding: UTF-8
 LazyData: FALSE
 Roxygen: list(markdown = TRUE)
-RoxygenNote: 7.3.2
+RoxygenNote: 7.3.3
 Config/testthat/edition: 3

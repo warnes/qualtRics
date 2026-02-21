@@ -42,7 +42,7 @@ survey_questions <- function(surveyID) {
   # SEND REQUEST TO API ----
 
   # GET request to download metadata
-  resp <- qualtrics_api_request("GET", surveys_url)
+  resp <- cached_api_request("GET", surveys_url)
 
   # Get question information
   qi <- resp$result$questions

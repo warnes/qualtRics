@@ -1,7 +1,18 @@
 skip_on_cran()
 
+# Helper: skip tests that require live API credentials
+skip_if_no_real_api <- function() {
+  skip_if(
+    Sys.getenv("QUALTRICS_BASE_URL") == "iad1.qualtrics.com",
+    "Skipping live-API test: only test credentials available"
+  )
+}
+
 test_that("extract_colmap() retrieves an appropriate column map generated within read_survey", {
-  x <- fetch_survey("SV_56icaa9YAafpAqx", add_column_map = TRUE)
+  skip_if_no_real_api()
+  vcr::turned_off({
+    x <- fetch_survey("SV_56icaa9YAafpAqx", responses = "complete", add_column_map = TRUE)
+  })
   cm <- extract_colmap(x)
 
   expect_s3_class(cm, c("tbl_df", "tbl", "data.frame"))

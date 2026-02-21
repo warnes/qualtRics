@@ -1,0 +1,134 @@
+ℹ Testing qualtRics
+✔ | F W  S  OK | Context
+
+⠏ |          0 | fetch-survey                                                     |                                                                              |                                                                      |   0%  |                                                                              |======================================================================| 100%
+
+-- Column specification --------------------------------------------------------
+cols(
+  .default = col_logical(),
+  StartDate = col_datetime(format = ""),
+  EndDate = col_datetime(format = ""),
+  Status = col_character(),
+  IPAddress = col_character(),
+  Progress = col_double(),
+  `Duration (in seconds)` = col_double(),
+  RecordedDate = col_datetime(format = ""),
+  ResponseId = col_character(),
+  LocationLatitude = col_double(),
+  LocationLongitude = col_double(),
+  DistributionChannel = col_character(),
+  UserLanguage = col_character(),
+  Q1 = col_character(),
+  Q3_1 = col_double(),
+  Q4 = col_character(),
+  Q6_2 = col_character(),
+  Q7 = col_character(),
+  Q224 = col_character(),
+  Q9 = col_character(),
+  Q10 = col_character()
+  # ... with 229 more columns
+)
+i Use `spec()` for the full column specifications.
+
+'StartDate', 'EndDate', and 'RecordedDate' were converted without a specific timezone
+* To set a timezone, visit https://www.qualtrics.com/support/survey-platform/managing-your-account/
+* Timezone information is under 'User Settings'
+* See https://api.qualtrics.com/instructions/docs/Instructions/dates-and-times.md for more
+
+⠋ |          1 | fetch-survey                                                     |                                                                              |                                                                      |   0%  |                                                                              |======================================================================| 100%
+
+-- Column specification --------------------------------------------------------
+cols(
+  StartDate = col_datetime(format = ""),
+  EndDate = col_datetime(format = ""),
+  ResponseId = col_character(),
+  Q1 = col_character(),
+  SC0 = col_double(),
+  Name = col_logical(),
+  Org_Name = col_logical(),
+  RefNo = col_logical(),
+  Salutation = col_logical(),
+  SessionID = col_character(),
+  SurveyID = col_character(),
+  Q_R = col_logical(),
+  DeviceIdentifier = col_logical(),
+  ResponseID = col_character(),
+  UserAgent = col_character()
+)
+
+
+⠋ |         11 | fetch-survey                                                     |                                                                              |                                                                      |   0%  |                                                                              |======================================================================| 100%
+
+-- Column specification --------------------------------------------------------
+cols(
+  SC0 = col_double(),
+  Name = col_logical(),
+  Org_Name = col_logical(),
+  RefNo = col_logical(),
+  Salutation = col_logical(),
+  SessionID = col_character(),
+  SurveyID = col_character(),
+  Q_R = col_logical(),
+  DeviceIdentifier = col_logical(),
+  ResponseID = col_character(),
+  UserAgent = col_character()
+)
+
+
+⠴ |         16 | fetch-survey                                                     |                                                                              |                                                                      |   0%  |                                                                              |======================================================================| 100%
+
+-- Column specification --------------------------------------------------------
+cols(
+  .default = col_character()
+)
+i Use `spec()` for the full column specifications.
+
+
+⠇ |         19 | fetch-survey                                                     |                                                                              |                                                                      |   0%  |                                                                              |======================================================================| 100%
+
+-- Column specification --------------------------------------------------------
+cols(
+  .default = col_character(),
+  StartDate = col_datetime(format = ""),
+  EndDate = col_datetime(format = ""),
+  Progress = col_double(),
+  `Duration (in seconds)` = col_double(),
+  Finished = col_logical(),
+  RecordedDate = col_datetime(format = ""),
+  RecipientLastName = col_logical(),
+  RecipientFirstName = col_logical(),
+  RecipientEmail = col_logical(),
+  ExternalReference = col_logical(),
+  LocationLatitude = col_double(),
+  LocationLongitude = col_double(),
+  Q3_1 = col_double(),
+  Q5 = col_logical(),
+  Q14_9_TEXT = col_logical(),
+  Q235 = col_logical(),
+  Q20 = col_logical(),
+  Q21_1 = col_logical(),
+  Q21_2 = col_logical(),
+  Q21_3 = col_logical()
+  # ... with 113 more columns
+)
+i Use `spec()` for the full column specifications.
+
+  |                                                                              |                                                                      |   0%  |                                                                              |======================================================================| 100%
+
+-- Column specification --------------------------------------------------------
+cols(
+  .default = col_character()
+)
+i Use `spec()` for the full column specifications.
+
+
+⠏ |         20 | fetch-survey                                                   
+⠸ |         24 | fetch-survey                                                   
+⠏ |         30 | fetch-survey                                                   
+⠦ |         37 | fetch-survey                                                   
+✔ |         37 | fetch-survey [30.1s]
+
+══ Results ═════════════════════════════════════════════════════════════════════
+Duration: 30.1 s
+
+[ FAIL 0 | WARN 0 | SKIP 0 | PASS 37 ]

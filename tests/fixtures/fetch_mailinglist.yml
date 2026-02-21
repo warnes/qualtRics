@@ -1,0 +1,12 @@
+http_interactions:
+- request:
+    method: GET
+    uri: https://iad1.qualtrics.com/API/v3/mailinglists/ML_abcdef123456789/contacts
+  response:
+    status: 200
+    headers:
+      content-type: application/json
+    body:
+      string: '{"result":{"elements":[{"id":"CID_abc123","firstName":"John","lastName":"Doe","email":"john.doe@example.com","externalDataReference":"EXT001","language":"EN","unsubscribed":false,"responseHistory":[],"emailHistory":[],"embeddedData":{"key1":"value1"}},{"id":"CID_def456","firstName":"Jane","lastName":"Smith","email":"jane.smith@example.com","externalDataReference":"EXT002","language":"EN","unsubscribed":true,"responseHistory":[],"emailHistory":[],"embeddedData":null}],"nextPage":null},"meta":{"requestId":"test-req-id","httpStatus":"200 - OK"}}'
+  recorded_at: 2025-01-01 00:00:00
+recorded_with: VCR-vcr/2.0.0

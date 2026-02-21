@@ -65,6 +65,21 @@
 #'   column types that may be incorrectly guessed. Takes a [readr::cols()]
 #'   specification. See example below and [readr::cols()] for formatting
 #'   details. Defaults to `NULL`. Overwritten by `convert = TRUE`.
+#' @param responses String. Which responses to return. Must be one of:
+#'   \describe{
+#'     \item{`"complete"`}{Only submitted (finished) responses. Equivalent to
+#'       the default Qualtrics export behaviour.}
+#'     \item{`"in_progress"`}{Only responses that have been started but not yet
+#'       submitted (`Finished == FALSE`). Uses the
+#'       `exportResponsesInProgress` API parameter.}
+#'     \item{`"all"`}{All responses — submitted and in-progress — combined.
+#'       Makes two API requests and row-binds the results.}
+#'   }
+#'   This argument is **required** and has no default; you must explicitly
+#'   choose which responses to retrieve.
+#' @param quiet Logical. If `TRUE`, suppress the column-type messages that
+#'   [readr::type_convert()] prints when `col_types` is not supplied. Defaults
+#'   to `FALSE`.
 #' @param verbose Logical. If `TRUE`, verbose messages will be printed to the R
 #'   console. Defaults to `TRUE`.
 #' @param tmp_dir Path to filesystem directory. Qualtrics returns response data
@@ -72,9 +87,7 @@
 #'   written to disk (the file is then promptly deleted). By default, the
 #'   system's temporary directory is used for this (see [tempdir()]), but
 #'   users needing more control can specify an alternate location here.
-#' @param last_response Deprecated.
-#' @param force_request Deprecated.
-#' @param save_dir Deprecated.
+
 #'
 #' @seealso See <https://api.qualtrics.com/> for documentation on the Qualtrics
 #'   API.
@@ -158,7 +171,6 @@
 #' This argument accepts the user-specified names of any embedded data variables
 #' in the survey being accessed.
 #'
-#' @importFrom lifecycle deprecated
 #' @importFrom purrr compact
 #' @importFrom glue glue
 #' @export
@@ -210,24 +222,13 @@ fetch_survey <-
            add_var_labels = TRUE,
            strip_html = TRUE,
            col_types = NULL,
+           quiet = FALSE,
+           responses = c("complete", "in_progress", "all"),
            verbose = TRUE,
-           tmp_dir = tempdir(),
-           last_response = deprecated(),
-           force_request = deprecated(),
-           save_dir = deprecated()
+           tmp_dir = tempdir()
   ) {
 
     # Check/format arguments --------------------------------------------------
-
-    if (lifecycle::is_present(last_response)) {
-      lifecycle::deprecate_stop("3.1.2", "fetch_survey(last_response = )")
-    }
-    if (lifecycle::is_present(force_request)) {
-      lifecycle::deprecate_warn("3.2.0", "fetch_survey(force_request = )")
-    }
-    if (lifecycle::is_present(save_dir)) {
-      lifecycle::deprecate_warn("3.2.0", "fetch_survey(save_dir = )")
-    }
 
     # Check if API credentials stored (and likely suitable)
     check_credentials()
@@ -258,6 +259,8 @@ fetch_survey <-
     checkarg_isintegerish(unanswer_recode)
     checkarg_isintegerish(unanswer_recode_multi)
     checkarg_isboolean(include_display_order)
+    responses <- match.arg(responses, several.ok = FALSE)
+    checkarg_isboolean(quiet)
     checkarg_isboolean(verbose)
     checkarg_isboolean(import_id)
     checkarg_isboolean(add_column_map)
@@ -269,7 +272,8 @@ fetch_survey <-
     # Create raw JSON payload (request body)
     # Names are param names for endpoint, as specified at:
     # https://api.qualtrics.com/6b00592b9c013-start-response-export
-    raw_payload <-
+    # Helper to build a payload for one response type
+    make_payload <- function(in_progress_flag) {
       create_raw_payload(
         format = "csv",
         useLabels = label,
@@ -280,39 +284,56 @@ fetch_survey <-
         seenUnansweredRecode = unanswer_recode,
         multiselectSeenUnansweredRecode = unanswer_recode_multi,
         includeDisplayOrder = include_display_order,
+        exportResponsesInProgress = if (in_progress_flag) TRUE else NULL,
         questionIds = include_questions_formatted,
         embeddedDataIds = include_embedded_formatted,
         surveyMetadataIds = include_metadata_formatted,
         breakoutSets = breakout_sets
       )
+    }
 
-
-    rawdata <-
-      export_responses_request(
-        surveyID = surveyID,
-        body = raw_payload,
-        verbose = verbose,
-        tmp_dir = tmp_dir
-      )
-
-    # Read downloaded .csv & clean -------------------------------------------
-
-    data <-
-      process_raw_survey(
-        rawdata = rawdata,
-        import_id = import_id,
-        time_zone = time_zone_formatted,
-        col_types = col_types,
+    # Helper: request + process a single export.
+    # Delegates to the package-level memoised function so the fully-processed
+    # data frame is cached across calls with identical parameters.
+    fetch_and_process <- function(in_progress_flag) {
+      cached_fetch_and_process(
+        surveyID       = surveyID,
+        body           = make_payload(in_progress_flag),
+        verbose        = verbose,
+        tmp_dir        = tmp_dir,
+        import_id      = import_id,
+        time_zone      = time_zone_formatted,
+        col_types      = col_types,
+        quiet          = quiet,
         add_column_map = add_column_map,
         add_var_labels = add_var_labels,
-        strip_html = strip_html
+        strip_html     = strip_html,
+        convert        = convert,
+        label          = label
       )
-
-    # Add types
-    if (convert & label) {
-      data <-
-        infer_data_types(data, surveyID)
     }
+
+    data <- if (responses == "all") {
+      # Two separate requests, each fully processed, then row-bound.
+      # If either result is empty (0 rows), readr::type_convert leaves all
+      # columns as character, which makes dplyr::bind_rows fail with a type
+      # mismatch.  Guard by only binding when both sides are non-empty.
+      completed    <- fetch_and_process(FALSE)
+      in_progress  <- fetch_and_process(TRUE)
+      if (nrow(in_progress) == 0L && nrow(completed) == 0L) {
+        completed                                    # both empty: return either
+      } else if (nrow(in_progress) == 0L) {
+        completed
+      } else if (nrow(completed) == 0L) {
+        in_progress
+      } else {
+        dplyr::bind_rows(completed, in_progress)
+      }
+    } else {
+      fetch_and_process(responses == "in_progress")
+    }
+
+    # (convert & infer already applied inside fetch_and_process)
 
     # Return data -----------------------------------------------------
 
@@ -360,9 +381,10 @@ export_responses_request <-
       )
 
     # Download .zip file and extract raw response data:
+    # (routes through on-disk cache when caching is enabled)
 
     survey_rawdata <-
-      export_responses_filedownload(
+      cached_file_download(
         surveyID = surveyID,
         fileID = fileID,
         tmp_dir = tmp_dir

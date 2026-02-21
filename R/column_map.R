@@ -43,7 +43,7 @@ column_map <- function(surveyID) {
 
   # SEND REQUEST TO API ----
   # Send GET request to specific survey
-  resp <- qualtrics_api_request("GET", survey_url)
+  resp <- cached_api_request("GET", survey_url)
 
   # Get question information and map
   c_map <- resp$result$exportColumnMap

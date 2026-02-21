@@ -46,7 +46,7 @@ all_surveys <- function() {
 
   # Send GET request to list all surveys
   resp <-
-    qualtrics_api_request("GET", surveys_url)
+    cached_api_request("GET", surveys_url)
   # Put results in list
   master <- list()
   # Append results
@@ -55,7 +55,7 @@ all_surveys <- function() {
   # If nextPage != null and not "string" placeholder, keep calling
   while (!is.null(resp$result$nextPage) && resp$result$nextPage != "string") {
     # Send GET request to list all surveys
-    resp <- qualtrics_api_request("GET", resp$result$nextPage)
+    resp <- cached_api_request("GET", resp$result$nextPage)
     # Append results
     master <- append(master, resp$result$elements)
   }

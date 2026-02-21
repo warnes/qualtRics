@@ -148,6 +148,7 @@ process_raw_survey <-
     import_id,
     time_zone,
     col_types,
+    quiet = FALSE,
     add_column_map,
     add_var_labels,
     strip_html,
@@ -169,11 +170,13 @@ process_raw_survey <-
 
     # Infer data types from data:
     responsedata <-
-      readr::type_convert(
-        responsedata,
-        locale = readr::locale(tz = time_zone),
-        col_types = col_types,
-        na = character()
+      (if (quiet) suppressMessages else identity)(
+        readr::type_convert(
+          responsedata,
+          locale = readr::locale(tz = time_zone),
+          col_types = col_types,
+          na = character()
+        )
       )
 
 

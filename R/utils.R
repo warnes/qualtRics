@@ -287,7 +287,7 @@ paginate_api_request <- function(fetch_url) {
   elements <- list()
 
   while(!is.null(fetch_url)) {
-    res <- qualtrics_api_request("GET", url = fetch_url)
+    res <- cached_api_request("GET", url = fetch_url)
     elements <- append(elements, res$result$elements)
     fetch_url <- res$result$nextPage
     # check for "string" placeholder from mock server:
@@ -316,10 +316,14 @@ paginate_api_request <- function(fetch_url) {
 
 infer_data_types <- function(data,
                              surveyID,
-                             verbose = FALSE) {
+                             verbose = FALSE,
+                             col_types = NULL) {
 
   # Download survey metadata
   md <- md <- tibble::enframe(metadata(surveyID, get = "questions")[[1]])
+
+  # Columns explicitly typed by the user should not be overwritten
+  user_typed_cols <- if (!is.null(col_types)) names(col_types$cols) else character(0)
 
   # Check which questions are of allowed types
   md_parsed <- dplyr::mutate(md,
@@ -330,7 +334,8 @@ infer_data_types <- function(data,
                              type_supp = type_supp %in% c("MC"),
                              selector_supp = selector_supp %in% c("SAVR"),
                              name_in_survey = question_name %in% names(data),
-                             supported = type_supp & selector_supp & name_in_survey)
+                             supported = type_supp & selector_supp & name_in_survey &
+                               !(question_name %in% user_typed_cols))
 
   mc <- dplyr::pull(dplyr::filter(md_parsed, supported), name)
 
@@ -390,11 +395,13 @@ ln <-
   )
 
   ln <- remove_html(ln)
+  ln <- stringr::str_trim(ln)
 
   # Convert
   dplyr::mutate(
     data,
     !!col_name := as.character(!!col_name),
+    !!col_name := stringr::str_trim(!!col_name),
     !!col_name := readr::parse_factor(!!col_name,
                                       levels = ln,
                                       ordered = TRUE,
