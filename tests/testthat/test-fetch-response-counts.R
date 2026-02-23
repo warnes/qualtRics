@@ -5,38 +5,39 @@ skip_on_cran()
 COLS_ALL <- c(
   "survey_id", "survey_name",
   "dist_invited", "dist_in_progress", "dist_completed",
+  "dist_response_rate_complete", "dist_response_rate_total",
   "meta_completed", "meta_response_rate",
-  "export_completed", "export_in_progress", "export_response_rate"
+  "export_in_progress"
 )
 COLS_DIST <- c(
   "survey_id", "survey_name",
-  "dist_invited", "dist_in_progress", "dist_completed"
+  "dist_invited", "dist_in_progress", "dist_completed",
+  "dist_response_rate_complete", "dist_response_rate_total"
 )
 COLS_META <- c(
   "survey_id", "survey_name",
   "meta_completed", "meta_response_rate"
 )
-COLS_RESP <- c(
-  "survey_id", "survey_name",
-  "export_completed", "export_in_progress", "export_response_rate"
-)
 COLS_DIST_META <- c(
   "survey_id", "survey_name",
   "dist_invited", "dist_in_progress", "dist_completed",
+  "dist_response_rate_complete", "dist_response_rate_total",
   "meta_completed", "meta_response_rate"
 )
-COLS_DIST_RESP <- c(
+COLS_INPROG <- c(
   "survey_id", "survey_name",
-  "dist_invited", "dist_in_progress", "dist_completed",
-  "export_completed", "export_in_progress", "export_response_rate"
+  "export_in_progress"
 )
 
 # Fake API results used by mocks -----------------------------------------------
 
+# Two rows: one Invite (100 sent) + one Reminder (80 sent to non-responders).
+# dist_invited should be 100 (Invite only), NOT 180 (all rows summed).
 fake_distributions <- tibble::tibble(
-  stats_sent     = 100L,
-  stats_started  = 60L,
-  stats_finished = 50L
+  requestType    = c("Invite", "Reminder"),
+  stats_sent     = c(100L, 80L),
+  stats_started  = c(60L, 15L),
+  stats_finished = c(50L, 10L)
 )
 
 fake_metadata <- list(
@@ -44,7 +45,6 @@ fake_metadata <- list(
   responsecounts = list(auditable = 55L)
 )
 
-fake_survey_complete   <- tibble::tibble(ResponseId = paste0("R_", 1:50))
 fake_survey_inprogress <- tibble::tibble(ResponseId = paste0("R_ip_", 1:10))
 
 # local_mock_deps(): mocks the three direct dependencies of
@@ -54,10 +54,7 @@ local_mock_deps <- function(.env = parent.frame()) {
     check_credentials   = function()            invisible(NULL),
     fetch_distributions = function(sid, ...)    fake_distributions,
     metadata            = function(sid, ...)    fake_metadata,
-    fetch_survey        = function(sid, responses = "complete", ...) {
-      if (responses == "complete")    fake_survey_complete
-      else                            fake_survey_inprogress
-    },
+    fetch_survey        = function(sid, responses = "in_progress", ...) fake_survey_inprogress,
     .env = .env
   )
 }
@@ -92,27 +89,28 @@ test_that("fetch_response_counts() returns correct structure for a single survey
   expect_s3_class(x, c("tbl_df", "tbl", "data.frame"))
   expect_equal(nrow(x), 1L)
   expect_named(x, COLS_ALL)
-  expect_type(x$survey_id,            "character")
-  expect_type(x$survey_name,          "character")
-  expect_type(x$dist_invited,         "integer")
-  expect_type(x$dist_in_progress,     "integer")
-  expect_type(x$dist_completed,       "integer")
-  expect_type(x$meta_completed,       "integer")
-  expect_type(x$meta_response_rate,   "double")
-  expect_type(x$export_completed,     "integer")
-  expect_type(x$export_in_progress,   "integer")
-  expect_type(x$export_response_rate, "double")
-  # values from fake_distributions: sent=100, started=60, finished=50
-  expect_equal(x$dist_invited,     100L)
-  expect_equal(x$dist_in_progress,  10L)   # 60 - 50
-  expect_equal(x$dist_completed,    50L)
+  expect_type(x$survey_id,                 "character")
+  expect_type(x$survey_name,               "character")
+  expect_type(x$dist_invited,              "integer")
+  expect_type(x$dist_in_progress,          "integer")
+  expect_type(x$dist_completed,            "integer")
+  expect_type(x$dist_response_rate_complete, "double")
+  expect_type(x$dist_response_rate_total,  "double")
+  expect_type(x$meta_completed,            "integer")
+  expect_type(x$meta_response_rate,        "double")
+  expect_type(x$export_in_progress,        "integer")
+  # values from fake_distributions: Invite sent=100, Reminder sent=80 (excluded)
+  # started = 60+15 = 75, finished = 50+10 = 60, in_progress = 75-60 = 15
+  expect_equal(x$dist_invited,     100L)        # Invite rows only
+  expect_equal(x$dist_in_progress,  15L)        # (60+15) - (50+10)
+  expect_equal(x$dist_completed,    60L)        # sum across all distribution types
+  expect_equal(x$dist_response_rate_complete, 60 / 100)   # 0.60
+  expect_equal(x$dist_response_rate_total,    75 / 100)   # (60+15) / 100 = 0.75
   # values from fake_metadata: auditable=55
-  expect_equal(x$meta_completed,    55L)
-  expect_equal(x$meta_response_rate, 55 / 100)
-  # values from fake_survey_complete/inprogress: 50 / 10
-  expect_equal(x$export_completed,   50L)
+  expect_equal(x$meta_completed,     55L)
+  expect_equal(x$meta_response_rate, 55 / 100)  # 0.55
+  # values from fake_survey_inprogress: 10 rows
   expect_equal(x$export_in_progress, 10L)
-  expect_equal(x$export_response_rate, 50 / 100)
 })
 
 test_that("fetch_response_counts() returns one row per survey for multiple surveys", {
@@ -165,7 +163,9 @@ test_that("fetch_response_counts() type='distributions' returns only dist_* colu
   x <- fetch_response_counts("SV_abcdef123456789", type = "distributions")
 
   expect_named(x, COLS_DIST)
-  expect_equal(x$dist_invited, 100L)
+  expect_equal(x$dist_invited,              100L)       # Invite rows only, not Reminder rows
+  expect_equal(x$dist_response_rate_complete, 60 / 100) # 0.60
+  expect_equal(x$dist_response_rate_total,    75 / 100) # 0.75
 })
 
 test_that("fetch_response_counts() type='metadata' returns only meta_* columns", {
@@ -175,42 +175,27 @@ test_that("fetch_response_counts() type='metadata' returns only meta_* columns",
 
   expect_named(x, COLS_META)
   expect_equal(x$meta_completed, 55L)
-  # dist data is fetched internally to support rate calculation even when
-  # type = "metadata" only, so meta_response_rate is computable
+  # Distributions API is fetched internally to provide the rate denominator
   expect_equal(x$meta_response_rate, 55 / 100)
 })
 
-test_that("fetch_response_counts() type='responses' returns only export_* columns", {
+test_that("fetch_response_counts() type='in_progress' returns only export_in_progress column", {
   local_mock_deps()
 
-  x <- fetch_response_counts("SV_abcdef123456789", type = "responses")
+  x <- fetch_response_counts("SV_abcdef123456789", type = "in_progress")
 
-  expect_named(x, COLS_RESP)
-  expect_equal(x$export_completed, 50L)
-  # dist data is fetched internally to support rate calculation even when
-  # type = "responses" only, so export_response_rate is computable
-  expect_equal(x$export_response_rate, 50 / 100)
+  expect_named(x, COLS_INPROG)
+  expect_equal(x$export_in_progress, 10L)
 })
 
-test_that("fetch_response_counts() type=c('distributions','metadata') returns combined columns", {
+test_that("fetch_response_counts() type=c('distributions','metadata') omits export_in_progress", {
   local_mock_deps()
 
   x <- fetch_response_counts("SV_abcdef123456789",
                               type = c("distributions", "metadata"))
 
   expect_named(x, COLS_DIST_META)
-  # response_rate computable because dist_invited is present
   expect_equal(x$meta_response_rate, 55 / 100)
-})
-
-test_that("fetch_response_counts() type=c('distributions','responses') returns combined columns", {
-  local_mock_deps()
-
-  x <- fetch_response_counts("SV_abcdef123456789",
-                              type = c("distributions", "responses"))
-
-  expect_named(x, COLS_DIST_RESP)
-  expect_equal(x$export_response_rate, 50 / 100)
 })
 
 test_that("fetch_response_counts() type='all' is equivalent to the default", {
