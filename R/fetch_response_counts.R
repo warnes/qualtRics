@@ -36,9 +36,11 @@
 #'   sends only — excludes anonymous/direct-link access):
 #'   \describe{
 #'     \item{dist_invited}{Unique contacts sent an initial invite
-#'       (`stats_sent` summed over `requestType == "Invite"` distributions
-#'       only). Reminder and ThankYou distributions target the same contacts
-#'       and are excluded to avoid overcounting.}
+#'       (`stats_sent` from the earliest `requestType == "Invite"` distribution
+#'       per mailing list). Reminder and ThankYou distributions are excluded.
+#'       When a mailing list was re-invited (e.g. after a link with a short
+#'       expiration date), only the first send is counted so that the same
+#'       contacts are not double-counted.}
 #'     \item{dist_in_progress}{Started but not submitted via a tracked link
 #'       (`stats_started - stats_finished`). Lower-bound estimate.}
 #'     \item{dist_completed}{Submitted via a tracked link (`stats_finished`).
@@ -176,6 +178,22 @@ fetch_response_counts <- function(
             dists[!is.na(dists$requestType) & dists$requestType == "Invite", ]
           } else {
             dists  # fall back to all rows if requestType is absent or never "Invite"
+          }
+
+          # Deduplicate by mailing list: when the same mailing list received
+          # multiple 'Invite' distributions (e.g. a resend after a link with a
+          # short expiration date), keep only the earliest send so that the same
+          # contacts are not counted more than once.
+          if (
+            nrow(invite_dists) > 1 &&
+            "recipients_mailingListId" %in% names(invite_dists) &&
+            any(!is.na(invite_dists$recipients_mailingListId))
+          ) {
+            invite_dists <- invite_dists[
+              order(invite_dists$recipients_mailingListId,
+                    invite_dists$sendDate, na.last = TRUE), ]
+            invite_dists <- invite_dists[
+              !duplicated(invite_dists$recipients_mailingListId), ]
           }
 
           dist_invited     <- sum(invite_dists$stats_sent, na.rm = TRUE)

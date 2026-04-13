@@ -206,3 +206,69 @@ test_that("fetch_response_counts() type='all' is equivalent to the default", {
 
   expect_equal(x_default, x_all)
 })
+
+# Mailing-list deduplication (resend after short expiry) -----------------------
+
+# Two 'Invite' distributions to the same mailing list: first batch had a short
+# expiration date and the same contacts were re-invited.  dist_invited must
+# reflect the count from the FIRST send only (500), not the sum of both (1000).
+fake_distributions_resend <- tibble::tibble(
+  requestType              = c("Invite",                             "Invite"),
+  recipients_mailingListId = c("ML_abc123",                         "ML_abc123"),
+  sendDate                 = as.POSIXct(c("2025-01-01", "2025-03-01"), tz = "UTC"),
+  stats_sent               = c(500L,                                500L),
+  stats_started            = c(200L,                                100L),
+  stats_finished           = c(150L,                                 60L)
+)
+
+test_that(
+  "fetch_response_counts() uses only the first Invite per mailing list (resend scenario)",
+  {
+    local_mocked_bindings(
+      check_credentials   = function()         invisible(NULL),
+      fetch_distributions = function(sid, ...) fake_distributions_resend,
+      metadata            = function(sid, ...) fake_metadata,
+      fetch_survey        = function(sid, responses = "in_progress", ...)
+        fake_survey_inprogress
+    )
+
+    x <- fetch_response_counts("SV_abcdef123456789", type = "distributions")
+
+    # Only the earliest Invite (500 sent) should be counted, not 1000
+    expect_equal(x$dist_invited, 500L)
+
+    # dist_started / dist_completed still sum all rows of dists (authoritative
+    # tracking of who actually clicked/submitted, regardless of which link)
+    # started = 200+100 = 300, finished = 150+60 = 210, in_progress = 90
+    expect_equal(x$dist_in_progress, 90L)
+    expect_equal(x$dist_completed,  210L)
+  }
+)
+
+test_that(
+  "fetch_response_counts() sums multiple Invite dists for distinct mailing lists",
+  {
+    # Two Invite distributions — different mailing lists — should NOT be
+    # deduplicated; both counts are additive (different audiences).
+    fake_two_lists <- tibble::tibble(
+      requestType              = c("Invite",    "Invite"),
+      recipients_mailingListId = c("ML_aaa",    "ML_bbb"),
+      sendDate                 = as.POSIXct(c("2025-01-01", "2025-01-01"), tz = "UTC"),
+      stats_sent               = c(300L,        200L),
+      stats_started            = c(100L,         80L),
+      stats_finished           = c( 80L,         60L)
+    )
+
+    local_mocked_bindings(
+      check_credentials   = function()         invisible(NULL),
+      fetch_distributions = function(sid, ...) fake_two_lists,
+      metadata            = function(sid, ...) fake_metadata,
+      fetch_survey        = function(sid, responses = "in_progress", ...)
+        fake_survey_inprogress
+    )
+
+    x <- fetch_response_counts("SV_abcdef123456789", type = "distributions")
+
+    expect_equal(x$dist_invited, 500L)  # 300 + 200 — two distinct audiences
+  }
+)
